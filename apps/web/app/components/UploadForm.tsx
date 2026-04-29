@@ -28,13 +28,34 @@ export default function UploadForm() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const file = fileInputRef.current?.files?.[0];
 
-    if (preview) {
-      setMsg("Sending to server... (Coming soon in Day 6!)");
-    } else {
-      setMsg("Please select an image first");
+    if (!file) return;
+
+    setMsg("Uploading to PicScale API...");
+
+    // 1. Create the "Envelope"
+    const formData = new FormData();
+    formData.append("image", file); // "image" must match upload.single('image') in your API
+
+    try {
+      // 2. Send the request to Port 5000
+      const response = await fetch("http://localhost:5000/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.status === 202) {
+        const data = await response.json();
+        setMsg(`Success! ID: ${data.id}. Worker will resize it soon.`);
+      } else {
+        setMsg("Upload failed. Check API logs.");
+      }
+    } catch (error) {
+      console.error("Connection error:", error);
+      setMsg("Could not connect to the API server.");
     }
   };
 
