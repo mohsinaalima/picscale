@@ -1,57 +1,88 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export default function UploadForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [status, setStatus] = useState<string>("Waiting for file...");
+  const [msg, setMsg] = useState("Please select an image");
+  const [preview, setPreview] = useState<string | null>(null);
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Correct cleanup logic
+  useEffect(() => {
+    if (!preview) return;
 
+    return () => {
+      URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  const handleFileChange = () => {
     const file = fileInputRef.current?.files?.[0];
 
-    if (!file) {
-      setStatus("No file selected!");
-      return;
-    }
+    if (file) {
+      setMsg(`File "${file.name}" selected.`);
 
-    if (!file.type.startsWith("image/")) {
-      setStatus("Only image files allowed!");
-      return;
+      const objectUrl = URL.createObjectURL(file);
+      setPreview(objectUrl);
     }
+  };
 
-    if (file.size > 5 * 1024 * 1024) {
-      setStatus("File too large! Max 5MB allowed.");
-      return;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (preview) {
+      setMsg("Sending to server... (Coming soon in Day 6!)");
+    } else {
+      setMsg("Please select an image first");
     }
-
-    setStatus(`Selected: ${file.name}. Ready to upload!`);
   };
 
   return (
-    <div className='p-6 bg-white rounded-xl shadow-md space-y-4 border border-gray-200'>
-      <form onSubmit={handleUpload} className='flex flex-col space-y-4'>
-        <label className='text-lg font-semibold text-gray-700'>
-          Upload High-Res Image
-        </label>
+    <div className='p-10 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 w-full max-w-md'>
+      <form onSubmit={handleSubmit} className='flex flex-col gap-6'>
+        <h2 className='text-xl font-bold text-center'>PicScale Upload</h2>
 
+        {/* Preview Window */}
+        {preview ? (
+          <div className='relative w-full h-48 rounded-lg overflow-hidden border-2 border-violet-500 shadow-lg'>
+            <img
+              src={preview}
+              alt='Preview'
+              className='w-full h-full object-cover'
+            />
+          </div>
+        ) : (
+          <div className='w-full h-48 bg-slate-800 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-600 text-slate-500'>
+            No Preview Available
+          </div>
+        )}
+
+        {/* File Input */}
         <input
           type='file'
           ref={fileInputRef}
-          className='file:bg-blue-50 file:text-blue-700 file:border-0 file:rounded-md file:px-4 file:py-2 hover:file:bg-blue-100 cursor-pointer'
+          onChange={handleFileChange}
+          accept='image/*'
+          className='block w-full text-sm text-slate-400
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-full file:border-0
+            file:text-sm file:font-semibold
+            file:bg-violet-50 file:text-violet-700
+            hover:file:bg-violet-100 cursor-pointer'
         />
 
+        {/* Upload Button */}
         <button
           type='submit'
-          className='bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200'
+          disabled={!preview}
+          className='bg-violet-600 p-3 rounded-lg font-bold hover:bg-violet-500 transition disabled:opacity-50'
         >
-          Process Image
+          Upload Image
         </button>
       </form>
 
-      <p className='text-sm text-gray-500 italic'>Status: {status}</p>
+      <p className='mt-6 text-violet-400 italic text-sm text-center'>{msg}</p>
     </div>
   );
 }
