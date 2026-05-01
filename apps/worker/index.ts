@@ -42,6 +42,7 @@ async function processImages() {
       where: { id: image.id },
       data: { status: "PROCESSING" },
     });
+    
 
     // 4. Resize with Sharp
     await sharp(inputPath)
