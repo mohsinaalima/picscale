@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import sharp from "sharp";
 import path from "path";
@@ -14,48 +14,47 @@ const prisma = new PrismaClient();
 
 const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 
-
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
 async function processImages() {
   try {
-    // 3. Find a PENDING image
+    // 1. Find a PENDING image using the 'url' field
     const image = await prisma.image.findFirst({
       where: { status: "PENDING" },
     });
 
-    if (!image) {
-      // Small log to show it's working
-      process.stdout.write(".");
-      return;
-    }
+    if (!image) return;
 
-    console.log(`\nFound image: ${image.filename}. Starting resize...`);
-
-    const inputPath = path.join(UPLOADS_DIR, image.filename);
-    const outputPath = path.join(UPLOADS_DIR, `thumb_${image.filename}`);
+    console.log(`\nFound image to process: ${image.id}`);
 
     // Update status to PROCESSING
     await prisma.image.update({
       where: { id: image.id },
       data: { status: "PROCESSING" },
     });
-    
 
-    // 4. Resize with Sharp
-    await sharp(inputPath)
-      .resize(200, 200, { fit: "cover" })
-      .toFile(outputPath);
+    /**
+     * NOTE: Since you are using Cloudinary, you can actually
+     * skip the local 'sharp' resize and just generate a
+     * Cloudinary thumbnail URL by manipulating the string.
+     */
+    const thumbnailCloudinaryUrl = image.url.replace(
+      "/upload/",
+      "/upload/w_200,h_200,c_fill/",
+    );
 
-    // Update status to COMPLETED
+    // Update status to COMPLETED and store the thumbnail URL
     await prisma.image.update({
       where: { id: image.id },
-      data: { status: "COMPLETED" },
+      data: {
+        status: "COMPLETED",
+        thumbUrl: thumbnailCloudinaryUrl,
+      },
     });
 
-    console.log(`✅ Successfully created thumbnail: thumb_${image.filename}`);
+    console.log(`✅ Successfully processed thumbnail for ID: ${image.id}`);
   } catch (error) {
     console.error("\n❌ Worker Error:", error);
   }

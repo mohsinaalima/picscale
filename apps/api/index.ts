@@ -1,75 +1,83 @@
 import express from "express";
 import multer from "multer";
 import cors from "cors";
-import path from "path";
-import { fileURLToPath } from "url";
 import { PrismaClient } from "@prisma/client";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import "dotenv/config"; // Ensure env variables are loaded
 
-// 1. Setup Prisma and Path
 const prisma = new PrismaClient();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 
-// 2. Middleware
-app.use(cors());
-app.use(express.json());
+// 1. Cloudinary Configuration
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// 3. Serve Uploads folder (Taaki browser thumbnails dekh sake)
-app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
-
-// 4. Multer Configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../../uploads"));
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+// 2. Setup Cloudinary Storage for Multer
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "user_uploads", // Folder name in Cloudinary
+    allowed_formats: ["jpg", "png", "jpeg", "webp"],
   },
 });
 
 const upload = multer({ storage });
 
-// 5. POST: Upload Image & Create DB Entry
+// 3. Middleware
+app.use(cors());
+app.use(express.json());
+
+// --- ROUTES ---
+
+/**
+ * @route   POST /upload
+ * @desc    Upload image to Cloudinary and save reference in DB
+ */
 app.post("/upload", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
-  }
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
-    // Database mein record banana taaki Worker ise dekh sake
+    const imageUrl = req.file.path; // Cloudinary URL
+
     const newImage = await prisma.image.create({
       data: {
-        filename: req.file.filename,
-        status: "PENDING", // Worker sirf PENDING status waali images uthayega
+        url: imageUrl,      // Must match schema.prisma
+        status: "PENDING",  // For the worker to pick up
       },
     });
 
-    res.status(202).json({
-      message: "Uploaded and queued for resizing",
-      id: newImage.id,
-      filename: newImage.filename,
-    });
+    // Send 201 (Created)
+    res.status(201).json(newImage);
   } catch (error) {
-    console.error("DB Error:", error);
-    res.status(500).json({ error: "Could not save to database" });
+    // This will now show the REAL error message in your terminal
+    console.error("❌ Database Error:", error); 
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-// 6. GET: Fetch Completed Images for Gallery
+/**
+ * @route   GET /images
+ * @desc    Fetch all completed images
+ */
 app.get("/images", async (req, res) => {
   try {
     const images = await prisma.image.findMany({
-      where: { status: "COMPLETED" }, // Sirf wahi dikhao jo resize ho chuki hain
+      where: { status: "COMPLETED" },
       orderBy: { createdAt: "desc" },
     });
     res.json(images);
   } catch (error) {
+    console.error("Fetch Error:", error);
     res.status(500).json({ error: "Failed to fetch images" });
   }
 });
 
-app.listen(5000, "0.0.0.0", () => {
-  console.log("🚀 API running on http://localhost:5000");
+// --- SERVER START ---
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 API running on http://localhost:${PORT}`);
 });

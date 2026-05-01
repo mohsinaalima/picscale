@@ -7,9 +7,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// apps/api/prisma/schema.prisma AND apps/worker/prisma/schema.prisma
 model Image {
   id        String   @id @default(uuid())
-  filename  String
+  url       String   // The original Cloudinary URL
+  thumbUrl  String?  // The processed thumbnail URL
   status    String   @default("PENDING")
   createdAt DateTime @default(now())
 }

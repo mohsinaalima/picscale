@@ -79,13 +79,11 @@ export default function Home() {
                 className='bg-slate-800 p-3 rounded-xl border border-slate-700'
               >
                 <img
-                  src={`http://localhost:5000/uploads/thumb_${img.filename}`}
+                  src={img.thumbUrl} // Use the cloud link directly!
                   alt='Thumbnail'
                   className='w-full h-40 object-cover rounded-lg mb-2'
                 />
-                <p className='text-[10px] text-slate-500 truncate'>
-                  {img.filename}
-                </p>
+                <p className='text-[10px] text-slate-500 truncate'>{img.id}</p>
               </div>
             ))}
           </div>

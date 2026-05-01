@@ -4,14 +4,12 @@ import { useRef, useState, useEffect } from "react";
 
 export default function UploadForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [msg, setMsg] = useState("Please select an image");
   const [preview, setPreview] = useState<string | null>(null);
 
-  // Correct cleanup logic
+  // Cleanup object URLs to prevent memory leaks
   useEffect(() => {
     if (!preview) return;
-
     return () => {
       URL.revokeObjectURL(preview);
     };
@@ -19,10 +17,8 @@ export default function UploadForm() {
 
   const handleFileChange = () => {
     const file = fileInputRef.current?.files?.[0];
-
     if (file) {
       setMsg(`File "${file.name}" selected.`);
-
       const objectUrl = URL.createObjectURL(file);
       setPreview(objectUrl);
     }
@@ -36,26 +32,32 @@ export default function UploadForm() {
 
     setMsg("Uploading to PicScale API...");
 
-    // 1. Create the "Envelope"
     const formData = new FormData();
-    formData.append("image", file); // "image" must match upload.single('image') in your API
+    formData.append("image", file);
 
     try {
-      // 2. Send the request to Port 5000
       const response = await fetch("http://localhost:5000/upload", {
         method: "POST",
         body: formData,
       });
 
-      if (response.status === 202) {
-        const data = await response.json();
+      const data = await response.json();
+
+      // ✅ FIX: Check for both 201 (Created) and 202 (Accepted)
+      if (response.ok || response.status === 201 || response.status === 202) {
         setMsg(`Success! ID: ${data.id}. Worker will resize it soon.`);
+        // Optional: Clear preview after success
+        setPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       } else {
-        setMsg("Upload failed. Check API logs.");
+        // If server returns 500, show the error from the server
+        setMsg(`Upload failed: ${data.error || "Check API logs"}`);
       }
     } catch (error) {
       console.error("Connection error:", error);
-      setMsg("Could not connect to the API server.");
+      setMsg(
+        "Could not connect to the API server. Is it running on port 5000?",
+      );
     }
   };
 
@@ -79,7 +81,6 @@ export default function UploadForm() {
           </div>
         )}
 
-        {/* File Input */}
         <input
           type='file'
           ref={fileInputRef}
@@ -93,7 +94,6 @@ export default function UploadForm() {
             hover:file:bg-violet-100 cursor-pointer'
         />
 
-        {/* Upload Button */}
         <button
           type='submit'
           disabled={!preview}
