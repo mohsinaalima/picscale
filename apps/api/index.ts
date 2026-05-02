@@ -4,65 +4,68 @@ import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
-import "dotenv/config"; // Ensure env variables are loaded
+import "dotenv/config";
 
 const prisma = new PrismaClient();
-const app = express();
+const app = express(); // ✅ sabse pehle ye hona chahiye
 
-// 1. Cloudinary Configuration
+// Cloudinary config
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 2. Setup Cloudinary Storage for Multer
+// Debug env check
+console.log("ENV CHECK:", {
+  cloud: process.env.CLOUDINARY_CLOUD_NAME,
+  key: process.env.CLOUDINARY_API_KEY ? "OK" : "MISSING",
+});
+
+// Storage (simple version)
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "user_uploads", // Folder name in Cloudinary
-    allowed_formats: ["jpg", "png", "jpeg", "webp"],
-  },
+  cloudinary,
+  params: async () => ({
+    folder: "user_uploads",
+  }),
 });
 
 const upload = multer({ storage });
 
-// 3. Middleware
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// --- ROUTES ---
-
-/**
- * @route   POST /upload
- * @desc    Upload image to Cloudinary and save reference in DB
- */
+// Upload route
 app.post("/upload", upload.single("image"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  console.log("📦 FILE DATA:", req.file);
+
+  if (!req.file) {
+    console.log("❌ No file received");
+    return res.status(400).json({ error: "No file uploaded" });
+  }
 
   try {
-    const imageUrl = req.file.path; // Cloudinary URL
+    const imageUrl = req.file.path;
+    console.log("✅ Cloudinary URL:", imageUrl);
 
     const newImage = await prisma.image.create({
       data: {
-        url: imageUrl,      // Must match schema.prisma
-        status: "PENDING",  // For the worker to pick up
+        url: imageUrl,
+        status: "PENDING",
       },
     });
 
-    // Send 201 (Created)
+    console.log("✅ DB SAVED:", newImage);
+
     res.status(201).json(newImage);
-  } catch (error) {
-    // This will now show the REAL error message in your terminal
-    console.error("❌ Database Error:", error); 
+  } catch (error: any) {
+    console.error("❌ ERROR:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-/**
- * @route   GET /images
- * @desc    Fetch all completed images
- */
+// Fetch route
 app.get("/images", async (req, res) => {
   try {
     const images = await prisma.image.findMany({
@@ -76,8 +79,7 @@ app.get("/images", async (req, res) => {
   }
 });
 
-// --- SERVER START ---
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 API running on http://localhost:${PORT}`);
+// Start server
+app.listen(5000, () => {
+  console.log("🚀 API running on http://localhost:5000");
 });
