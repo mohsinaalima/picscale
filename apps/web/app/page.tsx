@@ -72,18 +72,24 @@ export default function Home() {
             No images processed yet. Upload one above!
           </p>
         ) : (
-          <div className='grid grid-cols-2 md:grid-cols-3 gap-6'>
+          // Replace your grid-cols-3 with this:
+          <div className='columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4'>
             {images.map((img: any) => (
               <div
                 key={img.id}
-                className='bg-slate-800 p-3 rounded-xl border border-slate-700'
+                className='break-inside-avoid bg-slate-800 rounded-xl overflow-hidden group relative'
               >
                 <img
-                  src={img.thumbUrl} // Use the cloud link directly!
-                  alt='Thumbnail'
-                  className='w-full h-40 object-cover rounded-lg mb-2'
+                  src={img.url}
+                  className='w-full h-auto object-cover hover:opacity-90 transition-opacity'
                 />
-                <p className='text-[10px] text-slate-500 truncate'>{img.id}</p>
+
+                {/* Pinterest-style Hover Overlay */}
+                <div className='absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-3'>
+                  <button className='bg-red-600 text-white px-4 py-2 rounded-full font-bold text-sm'>
+                    Save
+                  </button>
+                </div>
               </div>
             ))}
           </div>
