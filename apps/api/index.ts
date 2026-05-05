@@ -65,6 +65,27 @@ app.post("/upload", upload.single("image"), async (req, res) => {
   }
 });
 
+app.delete("/images/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const image = await prisma.image.findUnique({ where: { id } });
+    if (!image) return res.status(404).send("Not found");
+
+    // 1. Delete from Cloudinary (using the public_id)
+
+    const publicId = image.url.split("/").pop()?.split(".")[0];
+    await cloudinary.uploader.destroy(`picscale_uploads/${publicId}`);
+
+    // 2. Delete from NeonDB
+    await prisma.image.delete({ where: { id } });
+
+    res.send("Deleted successfully");
+  } catch (err) {
+    res.status(500).send("Delete failed");
+  }
+});
+
 // Fetch route
 app.get("/images", async (req, res) => {
   try {
