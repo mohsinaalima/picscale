@@ -18,7 +18,6 @@ cloudinary.config({
 
 // Debug env check
 console.log("ENV CHECK:", {
-  cloud: process.env.CLOUDINARY_CLOUD_NAME,
   key: process.env.CLOUDINARY_API_KEY ? "OK" : "MISSING",
 });
 
@@ -39,6 +38,7 @@ app.use(express.json());
 // Upload route
 app.post("/upload", upload.single("image"), async (req, res) => {
   console.log("📦 FILE DATA:", req.file);
+  const { category } = req.body;
 
   if (!req.file) {
     console.log("❌ No file received");
@@ -50,11 +50,12 @@ app.post("/upload", upload.single("image"), async (req, res) => {
     console.log("✅ Cloudinary URL:", imageUrl);
 
     const newImage = await prisma.image.create({
-      data: {
-        url: imageUrl,
-        status: "PENDING",
-      },
-    });
+    data: {
+      url: (req.file as any).path,
+      category: category || "Abstract", 
+      status: "PENDING",
+    },
+  });
 
     console.log("✅ DB SAVED:", newImage);
 
