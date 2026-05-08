@@ -1,14 +1,28 @@
 "use client";
-import { useEffect, useState } from "react";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 
-// ✅ Type defined properly
+import { useEffect, useState } from "react";
+
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  UserButton,
+  useAuth,
+  useUser,
+} from "@clerk/nextjs";
+
+// ===============================
+// Types
+// ===============================
 type ImageType = {
   id: string;
   url: string;
   category?: string;
 };
 
+// ===============================
+// Home Component
+// ===============================
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("Abstract");
@@ -18,19 +32,23 @@ export default function Home() {
 
   const BASE_URL = "http://localhost:5000";
 
+  // Clerk
+  const { userId } = useAuth();
+  const { user } = useUser();
+
+  // ===============================
+  // Fetch Images
+  // ===============================
   const fetchImages = async () => {
     try {
       const res = await fetch(`${BASE_URL}/images`);
 
       const data = await res.json();
 
-      console.log("API DATA:", data);
-
-      // Ensure array
       if (Array.isArray(data)) {
         setImages(data);
       } else {
-        console.error("Images is not an array:", data);
+        console.error("Images is not array:", data);
         setImages([]);
       }
     } catch (err) {
@@ -43,13 +61,29 @@ export default function Home() {
     fetchImages();
   }, []);
 
+  // ===============================
+  // Upload Image
+  // ===============================
   const handleUpload = async () => {
-    if (!file) return alert("Please choose a file first!");
+    if (!file) {
+      return alert("Please choose a file first!");
+    }
+
+    if (!userId) {
+      return alert("Please login first!");
+    }
+
     setStatus("Uploading...");
 
     const formData = new FormData();
+
     formData.append("image", file);
     formData.append("category", category);
+
+    // Send Clerk User Data
+    formData.append("userId", userId);
+
+    formData.append("userEmail", user?.primaryEmailAddress?.emailAddress || "");
 
     try {
       const res = await fetch(`${BASE_URL}/upload`, {
@@ -57,20 +91,25 @@ export default function Home() {
         body: formData,
       });
 
-      if (res.ok) {
-        setStatus("Success!");
+      const data = await res.json();
 
-        // ✅ Refresh images immediately
-        await fetchImages();
+      console.log("UPLOAD RESPONSE:", data);
 
-        setTimeout(() => {
-          setIsUploadOpen(false);
-          setStatus("");
-          setFile(null);
-        }, 1500);
+      if (!res.ok) {
+        throw new Error(data.error || "Upload failed");
       }
+
+      setStatus("Success!");
+
+      await fetchImages();
+
+      setTimeout(() => {
+        setIsUploadOpen(false);
+        setStatus("");
+        setFile(null);
+      }, 1500);
     } catch (err) {
-      console.error(err);
+      console.error("Upload error:", err);
       setStatus("Upload failed!");
     }
   };
@@ -96,7 +135,6 @@ export default function Home() {
               Create
             </button>
 
-            {/* ✅ FIXED UserButton (no TS error) */}
             <UserButton />
           </SignedIn>
         </div>
@@ -125,20 +163,41 @@ export default function Home() {
 
       {/* MODAL */}
       {isUploadOpen && (
-        <div className='fixed inset-0 bg-black/90 flex justify-center items-center'>
+        <div className='fixed inset-0 bg-black/90 flex justify-center items-center z-50'>
           <div className='bg-zinc-900 p-8 rounded-3xl w-full max-w-lg'>
-            <h2 className='text-2xl mb-6'>Create Pin</h2>
+            <h2 className='text-2xl mb-6 font-bold'>Create Pin</h2>
 
-            <input
-              type='file'
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className='mb-4'
-            />
+            {/* Upload Box */}
+            <label className='flex items-center justify-center w-full h-52 border-2 border-dashed border-zinc-600 rounded-2xl cursor-pointer hover:border-red-500 transition overflow-hidden mb-5'>
+              {file ? (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt='Preview'
+                  className='w-full h-full object-cover'
+                />
+              ) : (
+                <div className='text-center'>
+                  <p className='text-zinc-300 text-lg font-semibold'>
+                    Click to Upload Image
+                  </p>
 
+                  <p className='text-zinc-500 text-sm mt-2'>PNG, JPG, JPEG</p>
+                </div>
+              )}
+
+              <input
+                type='file'
+                accept='image/*'
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className='hidden'
+              />
+            </label>
+
+            {/* Category */}
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className='w-full mb-4 p-2 bg-zinc-800'
+              className='w-full mb-4 p-3 bg-zinc-800 rounded-xl'
             >
               <option>Abstract</option>
               <option>Nature</option>
@@ -146,9 +205,10 @@ export default function Home() {
               <option>Portrait</option>
             </select>
 
+            {/* Upload Button */}
             <button
               onClick={handleUpload}
-              className='bg-red-600 w-full py-3 rounded-xl'
+              className='bg-red-600 hover:bg-red-700 w-full py-3 rounded-xl font-bold'
             >
               {status || "Upload"}
             </button>
