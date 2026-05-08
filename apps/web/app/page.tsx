@@ -1,11 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-} from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 
 // ✅ Type defined properly
 type ImageType = {
@@ -26,10 +21,21 @@ export default function Home() {
   const fetchImages = async () => {
     try {
       const res = await fetch(`${BASE_URL}/images`);
+
       const data = await res.json();
-      setImages(data);
+
+      console.log("API DATA:", data);
+
+      // Ensure array
+      if (Array.isArray(data)) {
+        setImages(data);
+      } else {
+        console.error("Images is not an array:", data);
+        setImages([]);
+      }
     } catch (err) {
       console.error("Gallery load error:", err);
+      setImages([]);
     }
   };
 
@@ -70,45 +76,45 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans">
+    <div className='min-h-screen bg-black text-white font-sans'>
       {/* NAVBAR */}
-      <nav className="flex justify-between items-center p-6 sticky top-0 bg-black/80 backdrop-blur-md z-40 border-b border-zinc-800">
-        <h1 className="text-3xl font-bold text-red-600">PicScale</h1>
+      <nav className='flex justify-between items-center p-6 sticky top-0 bg-black/80 backdrop-blur-md z-40 border-b border-zinc-800'>
+        <h1 className='text-3xl font-bold text-red-600'>PicScale</h1>
 
-        <div className="flex gap-6 items-center">
+        <div className='flex gap-6 items-center'>
           <SignedOut>
-            <div className="bg-zinc-800 hover:bg-zinc-700 px-6 py-2 rounded-full font-bold cursor-pointer">
-              <SignInButton mode="modal" />
+            <div className='bg-zinc-800 hover:bg-zinc-700 px-6 py-2 rounded-full font-bold cursor-pointer'>
+              <SignInButton mode='modal' />
             </div>
           </SignedOut>
 
           <SignedIn>
             <button
               onClick={() => setIsUploadOpen(true)}
-              className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-full font-bold"
+              className='bg-red-600 hover:bg-red-700 px-6 py-2 rounded-full font-bold'
             >
               Create
             </button>
 
             {/* ✅ FIXED UserButton (no TS error) */}
-            <UserButton/>
+            <UserButton />
           </SignedIn>
         </div>
       </nav>
 
       {/* GALLERY */}
-      <main className="max-w-7xl mx-auto p-6">
+      <main className='max-w-7xl mx-auto p-6'>
         {images.length === 0 ? (
-          <div className="flex justify-center h-64 text-zinc-500 items-center">
+          <div className='flex justify-center h-64 text-zinc-500 items-center'>
             No pins yet.
           </div>
         ) : (
-          <div className="columns-2 md:columns-3 lg:columns-5 gap-4 space-y-4">
+          <div className='columns-2 md:columns-3 lg:columns-5 gap-4 space-y-4'>
             {images.map((img) => (
-              <div key={img.id} className="break-inside-avoid">
+              <div key={img.id} className='break-inside-avoid'>
                 <img
                   src={img.url}
-                  className="rounded-2xl w-full"
+                  className='rounded-2xl w-full'
                   alt={img.category}
                 />
               </div>
@@ -119,20 +125,20 @@ export default function Home() {
 
       {/* MODAL */}
       {isUploadOpen && (
-        <div className="fixed inset-0 bg-black/90 flex justify-center items-center">
-          <div className="bg-zinc-900 p-8 rounded-3xl w-full max-w-lg">
-            <h2 className="text-2xl mb-6">Create Pin</h2>
+        <div className='fixed inset-0 bg-black/90 flex justify-center items-center'>
+          <div className='bg-zinc-900 p-8 rounded-3xl w-full max-w-lg'>
+            <h2 className='text-2xl mb-6'>Create Pin</h2>
 
             <input
-              type="file"
+              type='file'
               onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="mb-4"
+              className='mb-4'
             />
 
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full mb-4 p-2 bg-zinc-800"
+              className='w-full mb-4 p-2 bg-zinc-800'
             >
               <option>Abstract</option>
               <option>Nature</option>
@@ -142,7 +148,7 @@ export default function Home() {
 
             <button
               onClick={handleUpload}
-              className="bg-red-600 w-full py-3 rounded-xl"
+              className='bg-red-600 w-full py-3 rounded-xl'
             >
               {status || "Upload"}
             </button>
