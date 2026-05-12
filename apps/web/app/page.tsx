@@ -11,18 +11,17 @@ import {
   useUser,
 } from "@clerk/nextjs";
 
-// ===============================
 // Types
-// ===============================
+
 type ImageType = {
   id: string;
   url: string;
   category?: string;
 };
 
-// ===============================
+
 // Home Component
-// ===============================
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("Abstract");
@@ -36,9 +35,9 @@ export default function Home() {
   const { userId } = useAuth();
   const { user } = useUser();
 
-  // ===============================
+ 
   // Fetch Images
-  // ===============================
+ 
   const fetchImages = async () => {
     try {
       const res = await fetch(`${BASE_URL}/images`);
@@ -61,9 +60,9 @@ export default function Home() {
     fetchImages();
   }, []);
 
-  // ===============================
+  
   // Upload Image
-  // ===============================
+ 
   const handleUpload = async () => {
     if (!file) {
       return alert("Please choose a file first!");
@@ -114,6 +113,31 @@ export default function Home() {
     }
   };
 
+ 
+  // Like Image
+ 
+  const handleLike = async (imageId: string) => {
+    if (!userId) {
+      return alert("Please login first!");
+    }
+
+    try {
+      const res = await fetch(`${BASE_URL}/images/${imageId}/like`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await res.json();
+
+      console.log(data.message);
+    } catch (err) {
+      console.error("Like failed:", err);
+    }
+  };
+
   return (
     <div className='min-h-screen bg-black text-white font-sans'>
       {/* NAVBAR */}
@@ -149,12 +173,42 @@ export default function Home() {
         ) : (
           <div className='columns-2 md:columns-3 lg:columns-5 gap-4 space-y-4'>
             {images.map((img) => (
-              <div key={img.id} className='break-inside-avoid'>
+              <div key={img.id} className='break-inside-avoid group relative'>
                 <img
                   src={img.url}
                   className='rounded-2xl w-full'
                   alt={img.category}
                 />
+
+                {/* OVERLAY */}
+                <div className='absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all p-4 flex flex-col justify-between rounded-2xl'>
+                  {/* TOP BUTTONS */}
+                  <div className='flex justify-end gap-2'>
+                    {/* LIKE BUTTON */}
+                    <button
+                      onClick={() => handleLike(img.id)}
+                      className='bg-zinc-100/20 backdrop-blur-md p-2 rounded-full hover:bg-white/40'
+                    >
+                      ❤️
+                    </button>
+
+                    {/* SAVE BUTTON */}
+                    <button className='bg-red-600 px-4 py-2 rounded-full font-bold text-sm'>
+                      Save
+                    </button>
+                  </div>
+
+                  {/* BOTTOM INFO */}
+                  <div className='flex justify-between items-center'>
+                    <span className='text-xs font-medium'>
+                      @{img.id.slice(0, 8)}
+                    </span>
+
+                    <button className='text-[10px] bg-white text-black px-3 py-1 rounded-full font-bold'>
+                      Follow
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

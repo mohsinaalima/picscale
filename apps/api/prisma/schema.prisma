@@ -1,18 +1,35 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-// apps/api/prisma/schema.prisma AND apps/worker/prisma/schema.prisma
 model Image {
   id        String   @id @default(uuid())
-  url       String   // The original Cloudinary URL
-  category  String?  @default("Abstract") 
-  thumbUrl  String?  // The processed thumbnail URL
-  status    String   @default("PENDING")
+  url       String
+  category  String?
+  userId    String   // Owner of the post
+  likes     Like[]   // Relation to likes
+  saves     Save[]   // Relation to saves
   createdAt DateTime @default(now())
+}
+
+model Like {
+  id      String @id @default(uuid())
+  userId  String // Clerk ID of the person who liked
+  imageId String
+  image   Image  @relation(fields: [imageId], references: [id])
+
+  @@unique([userId, imageId]) // Prevent liking a post twice
+}
+
+model Save {
+  id      String @id @default(uuid())
+  userId  String // Clerk ID of the person who saved
+  imageId String
+  image   Image  @relation(fields: [imageId], references: [id])
+
+  @@unique([userId, imageId]) // Prevent saving twice
+}
+
+model Follow {
+  id          String @id @default(uuid())
+  followerId  String // Clerk ID of person following
+  followingId String // Clerk ID of person being followed
+
+  @@unique([followerId, followingId])
 }

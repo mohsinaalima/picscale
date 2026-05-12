@@ -7,7 +7,7 @@ import { CloudinaryStorage } from "multer-storage-cloudinary";
 import "dotenv/config";
 
 const prisma = new PrismaClient();
-const app = express(); // ✅ sabse pehle ye hona chahiye
+const app = express(); // 
 
 // Cloudinary config
 cloudinary.config({
@@ -41,27 +41,27 @@ app.post("/upload", upload.single("image"), async (req, res) => {
   const { category } = req.body;
 
   if (!req.file) {
-    console.log("❌ No file received");
+    console.log("No file received");
     return res.status(400).json({ error: "No file uploaded" });
   }
 
   try {
     const imageUrl = req.file.path;
-    console.log("✅ Cloudinary URL:", imageUrl);
+    console.log("Cloudinary URL:", imageUrl);
 
     const newImage = await prisma.image.create({
-    data: {
-      url: (req.file as any).path,
-      category: category || "Abstract", 
-      status: "PENDING",
-    },
-  });
+      data: {
+        url: (req.file as any).path,
+        category: category || "Abstract",
+        status: "PENDING",
+      },
+    });
 
-    console.log("✅ DB SAVED:", newImage);
+    console.log(" DB SAVED:", newImage);
 
     res.status(201).json(newImage);
   } catch (error: any) {
-    console.error("❌ ERROR:", error);
+    console.error(" ERROR:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -98,6 +98,29 @@ app.get("/images", async (req, res) => {
   } catch (error) {
     console.error("Fetch Error:", error);
     res.status(500).json({ error: "Failed to fetch images" });
+  }
+});
+
+// --- LIKE / UNLIKE ROUTE ---
+app.post("/images/:id/like", async (req, res) => {
+  const { id } = req.params;
+  const { userId } = req.body;
+
+  try {
+    const existingLike = await prisma.like.findUnique({
+      where: { userId_imageId: { userId, imageId: id } },
+    });
+
+    if (existingLike) {
+      // Unlike if already liked
+      await prisma.like.delete({ where: { id: existingLike.id } });
+      return res.json({ message: "Unliked" });
+    }
+
+    await prisma.like.create({ data: { userId, imageId: id } });
+    res.json({ message: "Liked" });
+  } catch (err) {
+    res.status(500).json({ error: "Operation failed" });
   }
 });
 
