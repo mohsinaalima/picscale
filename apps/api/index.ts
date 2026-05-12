@@ -7,7 +7,7 @@ import { CloudinaryStorage } from "multer-storage-cloudinary";
 import "dotenv/config";
 
 const prisma = new PrismaClient();
-const app = express(); // 
+const app = express();
 
 // Cloudinary config
 cloudinary.config({
@@ -38,7 +38,8 @@ app.use(express.json());
 // Upload route
 app.post("/upload", upload.single("image"), async (req, res) => {
   console.log("📦 FILE DATA:", req.file);
-  const { category } = req.body;
+
+  const { category, userId } = req.body;
 
   if (!req.file) {
     console.log("No file received");
@@ -47,39 +48,50 @@ app.post("/upload", upload.single("image"), async (req, res) => {
 
   try {
     const imageUrl = req.file.path;
+
     console.log("Cloudinary URL:", imageUrl);
 
     const newImage = await prisma.image.create({
       data: {
         url: (req.file as any).path,
         category: category || "Abstract",
+        userId,
         status: "PENDING",
       },
     });
 
-    console.log(" DB SAVED:", newImage);
+    console.log("DB SAVED:", newImage);
 
     res.status(201).json(newImage);
   } catch (error: any) {
-    console.error(" ERROR:", error);
+    console.error("ERROR:", error);
+
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
+// Delete Image
 app.delete("/images/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const image = await prisma.image.findUnique({ where: { id } });
-    if (!image) return res.status(404).send("Not found");
+    const image = await prisma.image.findUnique({
+      where: { id },
+    });
 
-    // 1. Delete from Cloudinary (using the public_id)
+    if (!image) {
+      return res.status(404).send("Not found");
+    }
 
+    // Delete from Cloudinary
     const publicId = image.url.split("/").pop()?.split(".")[0];
+
     await cloudinary.uploader.destroy(`picscale_uploads/${publicId}`);
 
-    // 2. Delete from NeonDB
-    await prisma.image.delete({ where: { id } });
+    // Delete from DB
+    await prisma.image.delete({
+      where: { id },
+    });
 
     res.send("Deleted successfully");
   } catch (err) {
@@ -87,17 +99,21 @@ app.delete("/images/:id", async (req, res) => {
   }
 });
 
-// Fetch route
+// Fetch Images
 app.get("/images", async (req, res) => {
   try {
     const images = await prisma.image.findMany({
       where: { status: "COMPLETED" },
       orderBy: { createdAt: "desc" },
     });
+
     res.json(images);
   } catch (error) {
     console.error("Fetch Error:", error);
-    res.status(500).json({ error: "Failed to fetch images" });
+
+    res.status(500).json({
+      error: "Failed to fetch images",
+    });
   }
 });
 
@@ -108,19 +124,92 @@ app.post("/images/:id/like", async (req, res) => {
 
   try {
     const existingLike = await prisma.like.findUnique({
-      where: { userId_imageId: { userId, imageId: id } },
+      where: {
+        userId_imageId: {
+          userId,
+          imageId: id,
+        },
+      },
     });
 
     if (existingLike) {
       // Unlike if already liked
-      await prisma.like.delete({ where: { id: existingLike.id } });
-      return res.json({ message: "Unliked" });
+      await prisma.like.delete({
+        where: {
+          id: existingLike.id,
+        },
+      });
+
+      return res.json({
+        message: "Unliked",
+      });
     }
 
-    await prisma.like.create({ data: { userId, imageId: id } });
-    res.json({ message: "Liked" });
+    await prisma.like.create({
+      data: {
+        userId,
+        imageId: id,
+      },
+    });
+
+    res.json({
+      message: "Liked",
+    });
   } catch (err) {
-    res.status(500).json({ error: "Operation failed" });
+    res.status(500).json({
+      error: "Operation failed",
+    });
+  }
+});
+
+// --- FOLLOW / UNFOLLOW ROUTE ---
+app.post("/follow", async (req, res) => {
+  const { followerId, followingId } = req.body;
+
+  if (followerId === followingId) {
+    return res.status(400).json({ error: "You cannot follow yourself!" });
+  }
+
+  try {
+    const existingFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId,
+        },
+      },
+    });
+
+    // Unfollow
+    if (existingFollow) {
+      await prisma.follow.delete({
+        where: {
+          id: existingFollow.id,
+        },
+      });
+
+      return res.json({
+        message: "Unfollowed",
+        isFollowing: false,
+      });
+    }
+
+    // Follow
+    await prisma.follow.create({
+      data: {
+        followerId,
+        followingId,
+      },
+    });
+
+    res.json({
+      message: "Followed",
+      isFollowing: true,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Follow operation failed",
+    });
   }
 });
 
