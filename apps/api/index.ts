@@ -21,7 +21,7 @@ console.log("ENV CHECK:", {
   key: process.env.CLOUDINARY_API_KEY ? "OK" : "MISSING",
 });
 
-// Storage (simple version)
+// Storage
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async () => ({
@@ -35,7 +35,9 @@ const upload = multer({ storage });
 app.use(cors());
 app.use(express.json());
 
-// Upload route
+// ===============================
+// Upload Route
+// ===============================
 app.post("/upload", upload.single("image"), async (req, res) => {
   console.log("📦 FILE DATA:", req.file);
 
@@ -43,7 +45,10 @@ app.post("/upload", upload.single("image"), async (req, res) => {
 
   if (!req.file) {
     console.log("No file received");
-    return res.status(400).json({ error: "No file uploaded" });
+
+    return res.status(400).json({
+      error: "No file uploaded",
+    });
   }
 
   try {
@@ -55,8 +60,8 @@ app.post("/upload", upload.single("image"), async (req, res) => {
       data: {
         url: (req.file as any).path,
         category: category || "Abstract",
+        status: "COMPLETED",
         userId,
-        status: "PENDING",
       },
     });
 
@@ -66,11 +71,15 @@ app.post("/upload", upload.single("image"), async (req, res) => {
   } catch (error: any) {
     console.error("ERROR:", error);
 
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({
+      error: "Internal Server Error",
+    });
   }
 });
 
+// ===============================
 // Delete Image
+// ===============================
 app.delete("/images/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -99,7 +108,9 @@ app.delete("/images/:id", async (req, res) => {
   }
 });
 
+// ===============================
 // Fetch Images
+// ===============================
 app.get("/images", async (req, res) => {
   try {
     const images = await prisma.image.findMany({
@@ -117,23 +128,24 @@ app.get("/images", async (req, res) => {
   }
 });
 
-// --- LIKE / UNLIKE ROUTE ---
-app.post("/images/:id/like", async (req, res) => {
-  const { id } = req.params;
-  const { userId } = req.body;
+// ===============================
+// LIKE / UNLIKE LOGIC
+// ===============================
+app.post("/like", async (req, res) => {
+  const { userId, imageId } = req.body;
 
   try {
     const existingLike = await prisma.like.findUnique({
       where: {
         userId_imageId: {
           userId,
-          imageId: id,
+          imageId,
         },
       },
     });
 
+    // Unlike
     if (existingLike) {
-      // Unlike if already liked
       await prisma.like.delete({
         where: {
           id: existingLike.id,
@@ -142,32 +154,89 @@ app.post("/images/:id/like", async (req, res) => {
 
       return res.json({
         message: "Unliked",
+        liked: false,
       });
     }
 
+    // Like
     await prisma.like.create({
       data: {
         userId,
-        imageId: id,
+        imageId,
       },
     });
 
     res.json({
       message: "Liked",
+      liked: true,
     });
   } catch (err) {
     res.status(500).json({
-      error: "Operation failed",
+      error: "Like failed",
     });
   }
 });
 
-// --- FOLLOW / UNFOLLOW ROUTE ---
+// ===============================
+// SAVE / UNSAVE LOGIC
+// ===============================
+app.post("/save", async (req, res) => {
+  const { userId, imageId } = req.body;
+
+  try {
+    const existingSave = await prisma.save.findUnique({
+      where: {
+        userId_imageId: {
+          userId,
+          imageId,
+        },
+      },
+    });
+
+    // Unsave
+    if (existingSave) {
+      await prisma.save.delete({
+        where: {
+          id: existingSave.id,
+        },
+      });
+
+      return res.json({
+        message: "Removed from board",
+        saved: false,
+      });
+    }
+
+    // Save
+    await prisma.save.create({
+      data: {
+        userId,
+        imageId,
+      },
+    });
+
+    res.json({
+      message: "Saved to board",
+      saved: true,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Save failed",
+    });
+  }
+});
+
+// ===============================
+// FOLLOW / UNFOLLOW ROUTE
+// ===============================
 app.post("/follow", async (req, res) => {
   const { followerId, followingId } = req.body;
 
+  // Prevent self follow
   if (followerId === followingId) {
-    return res.status(400).json({ error: "You cannot follow yourself!" });
+    return res.status(400).json({
+      error: "You cannot follow yourself!",
+    });
   }
 
   try {
@@ -213,7 +282,8 @@ app.post("/follow", async (req, res) => {
   }
 });
 
-// Start server
+// Start Server
+
 app.listen(5000, () => {
   console.log("🚀 API running on http://localhost:5000");
 });

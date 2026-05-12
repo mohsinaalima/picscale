@@ -11,17 +11,18 @@ import {
   useUser,
 } from "@clerk/nextjs";
 
+// ===============================
 // Types
-
+// ===============================
 type ImageType = {
   id: string;
   url: string;
   category?: string;
 };
 
-
+// ===============================
 // Home Component
-
+// ===============================
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("Abstract");
@@ -35,9 +36,9 @@ export default function Home() {
   const { userId } = useAuth();
   const { user } = useUser();
 
- 
+  // ===============================
   // Fetch Images
- 
+  // ===============================
   const fetchImages = async () => {
     try {
       const res = await fetch(`${BASE_URL}/images`);
@@ -60,9 +61,9 @@ export default function Home() {
     fetchImages();
   }, []);
 
-  
+  // ===============================
   // Upload Image
- 
+  // ===============================
   const handleUpload = async () => {
     if (!file) {
       return alert("Please choose a file first!");
@@ -113,28 +114,58 @@ export default function Home() {
     }
   };
 
- 
+  // ===============================
   // Like Image
- 
-  const handleLike = async (imageId: string) => {
-    if (!userId) {
-      return alert("Please login first!");
-    }
+  // ===============================
+  const handleLike = async (imgId: string) => {
+    if (!userId) return alert("Login to like!");
 
     try {
-      const res = await fetch(`${BASE_URL}/images/${imageId}/like`, {
+      const res = await fetch("http://localhost:5000/like", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({
+          userId,
+          imageId: imgId,
+        }),
       });
 
       const data = await res.json();
 
       console.log(data.message);
+
+      // Refresh feed
+      fetchImages();
     } catch (err) {
       console.error("Like failed:", err);
+    }
+  };
+
+  // ===============================
+  // Save Image
+  // ===============================
+  const handleSave = async (imgId: string) => {
+    if (!userId) return alert("Login to save!");
+
+    try {
+      const res = await fetch("http://localhost:5000/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          imageId: imgId,
+        }),
+      });
+
+      const data = await res.json();
+
+      alert(data.message);
+    } catch (err) {
+      console.error("Save failed:", err);
     }
   };
 
@@ -193,7 +224,10 @@ export default function Home() {
                     </button>
 
                     {/* SAVE BUTTON */}
-                    <button className='bg-red-600 px-4 py-2 rounded-full font-bold text-sm'>
+                    <button
+                      onClick={() => handleSave(img.id)}
+                      className='bg-red-600 px-4 py-2 rounded-full font-bold text-sm'
+                    >
                       Save
                     </button>
                   </div>
