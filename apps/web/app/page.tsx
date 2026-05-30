@@ -147,7 +147,10 @@ export default function Home() {
   // Save Image
   // ===============================
   const handleSave = async (imgId: string) => {
-    if (!userId) return alert("Login to save!");
+    if (!userId) {
+      alert("Please sign in to save pins!");
+      return;
+    }
 
     try {
       const res = await fetch("http://localhost:5000/save", {
@@ -161,11 +164,12 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
-
-      alert(data.message);
+      if (res.ok) {
+        const data = await res.json();
+        alert(data.message);
+      }
     } catch (err) {
-      console.error("Save failed:", err);
+      console.error("Error saving image:", err);
     }
   };
 
@@ -225,8 +229,11 @@ export default function Home() {
 
                     {/* SAVE BUTTON */}
                     <button
-                      onClick={() => handleSave(img.id)}
-                      className='bg-red-600 px-4 py-2 rounded-full font-bold text-sm'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSave(img.id);
+                      }}
+                      className='bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold text-sm transition-all shadow-md'
                     >
                       Save
                     </button>
