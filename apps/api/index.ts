@@ -21,6 +21,7 @@ console.log("ENV CHECK:", {
   key: process.env.CLOUDINARY_API_KEY ? "OK" : "MISSING",
 });
 
+
 // Storage
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -222,6 +223,36 @@ app.post("/save", async (req, res) => {
   } catch (err) {
     res.status(500).json({
       error: "Save failed",
+    });
+  }
+});
+
+// ===============================
+// GET USER SAVED IMAGES
+// ===============================
+app.get("/users/:userId/saved", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const savedRecords = await prisma.save.findMany({
+      where: {
+        userId,
+      },
+      include: {
+        image: true,
+      },
+    });
+
+    const savedImages = savedRecords.map(
+      (record) => record.image
+    );
+
+    res.json(savedImages);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      error: "Failed to fetch saved images",
     });
   }
 });
