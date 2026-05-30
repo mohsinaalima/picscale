@@ -29,6 +29,7 @@ export default function Home() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [status, setStatus] = useState("");
   const [images, setImages] = useState<ImageType[]>([]);
+  const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
 
   const BASE_URL = "http://localhost:5000";
 
@@ -41,7 +42,12 @@ export default function Home() {
   // ===============================
   const fetchImages = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/images`);
+      const endpoint =
+        activeTab === "saved" && userId
+          ? `${BASE_URL}/users/${userId}/saved`
+          : `${BASE_URL}/images`;
+
+      const res = await fetch(endpoint);
 
       const data = await res.json();
 
@@ -57,9 +63,7 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    fetchImages();
-  }, []);
+  
 
   // ===============================
   // Upload Image
@@ -198,6 +202,31 @@ export default function Home() {
           </SignedIn>
         </div>
       </nav>
+
+      {/* TABS CONTROLLER */}
+      <div className='flex justify-center gap-6 mt-6 text-sm font-bold'>
+        <button
+          onClick={() => setActiveTab("all")}
+          className={`px-4 py-2 rounded-full transition-all ${
+            activeTab === "all"
+              ? "bg-white text-black"
+              : "text-zinc-400 hover:text-white"
+          }`}
+        >
+          Explore All
+        </button>
+
+        <button
+          onClick={() => setActiveTab("saved")}
+          className={`px-4 py-2 rounded-full transition-all ${
+            activeTab === "saved"
+              ? "bg-white text-black"
+              : "text-zinc-400 hover:text-white"
+          }`}
+        >
+          Saved Pins
+        </button>
+      </div>
 
       {/* GALLERY */}
       <main className='max-w-7xl mx-auto p-6'>
