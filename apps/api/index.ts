@@ -263,7 +263,6 @@ app.get("/users/:userId/saved", async (req, res) => {
 app.post("/follow", async (req, res) => {
   const { followerId, followingId } = req.body;
 
-  // Prevent self follow
   if (followerId === followingId) {
     return res.status(400).json({
       error: "You cannot follow yourself!",
@@ -280,7 +279,6 @@ app.post("/follow", async (req, res) => {
       },
     });
 
-    // Unfollow
     if (existingFollow) {
       await prisma.follow.delete({
         where: {
@@ -294,7 +292,6 @@ app.post("/follow", async (req, res) => {
       });
     }
 
-    // Follow
     await prisma.follow.create({
       data: {
         followerId,
@@ -313,6 +310,39 @@ app.post("/follow", async (req, res) => {
   }
 });
 
+// ===============================
+// GET PROFILE ROUTE
+// ===============================
+app.get("/profile/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const creatorImages = await prisma.image.findMany({
+      where: { userId: id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const followersCount = await prisma.follow.count({
+      where: { followingId: id },
+    });
+
+    const followingCount = await prisma.follow.count({
+      where: { followerId: id },
+    });
+
+    res.json({
+      images: creatorImages,
+      followers: followersCount,
+      following: followingCount,
+    });
+  } catch (error) {
+    console.error("Profile fetch error:", error);
+
+    res.status(500).json({
+      error: "Failed to fetch profile details",
+    });
+  }
+});
 // Start Server
 
 app.listen(5000, () => {
