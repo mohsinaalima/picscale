@@ -18,6 +18,7 @@ type ImageType = {
   id: string;
   url: string;
   category?: string;
+  userId: string;
 };
 
 // ===============================
@@ -31,10 +32,15 @@ export default function Home() {
   const [images, setImages] = useState<ImageType[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
   // Creator Profile View Management
-  const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
-  const [creatorProfile, setCreatorProfile] = useState<{ images: ImageType[]; followers: number; following: number } | null>(null);
+  const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(
+    null,
+  );
+  const [creatorProfile, setCreatorProfile] = useState<{
+    images: ImageType[];
+    followers: number;
+    following: number;
+  } | null>(null);
   const [isFollowingCreator, setIsFollowingCreator] = useState(false);
-  
 
   const BASE_URL = "http://localhost:5000";
 
@@ -181,56 +187,55 @@ export default function Home() {
   };
 
   // ===============================
-// Fetch Creator Profile Analytics
-// ===============================
-const fetchCreatorProfile = async (creatorId: string) => {
-  try {
-    const profileRes = await fetch(`${BASE_URL}/profile/${creatorId}`);
-    const profileData = await profileRes.json();
-    setCreatorProfile(profileData);
+  // Fetch Creator Profile Analytics
+  // ===============================
+  const fetchCreatorProfile = async (creatorId: string) => {
+    try {
+      const profileRes = await fetch(`${BASE_URL}/profile/${creatorId}`);
+      const profileData = await profileRes.json();
+      setCreatorProfile(profileData);
 
-    if (userId) {
-      const checkRes = await fetch(
-        `${BASE_URL}/follow/check?followerId=${userId}&followingId=${creatorId}`
-      );
-      const checkData = await checkRes.json();
-      setIsFollowingCreator(checkData.isFollowing);
+      if (userId) {
+        const checkRes = await fetch(
+          `${BASE_URL}/follow/check?followerId=${userId}&followingId=${creatorId}`,
+        );
+        const checkData = await checkRes.json();
+        setIsFollowingCreator(checkData.isFollowing);
+      }
+    } catch (err) {
+      console.error("Failed to load creator profile data:", err);
     }
-  } catch (err) {
-    console.error("Failed to load creator profile data:", err);
-  }
-};
+  };
 
-// ===============================
-// Trigger Follow / Unfollow Toggle
-// ===============================
-const handleFollowToggle = async (creatorId: string) => {
-  if (!userId) return alert("Please sign in to follow creators!");
-  if (userId === creatorId)
-    return alert("You cannot follow yourself!");
+  // ===============================
+  // Trigger Follow / Unfollow Toggle
+  // ===============================
+  const handleFollowToggle = async (creatorId: string) => {
+    if (!userId) return alert("Please sign in to follow creators!");
+    if (userId === creatorId) return alert("You cannot follow yourself!");
 
-  try {
-    const res = await fetch(`${BASE_URL}/follow`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        followerId: userId,
-        followingId: creatorId,
-      }),
-    });
+    try {
+      const res = await fetch(`${BASE_URL}/follow`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          followerId: userId,
+          followingId: creatorId,
+        }),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      alert(data.message);
+      if (res.ok) {
+        const data = await res.json();
+        alert(data.message);
 
-      fetchCreatorProfile(creatorId);
+        fetchCreatorProfile(creatorId);
+      }
+    } catch (err) {
+      console.error("Follow operational exception caught:", err);
     }
-  } catch (err) {
-    console.error("Follow operational exception caught:", err);
-  }
-};
+  };
 
   return (
     <div className='min-h-screen bg-black text-white font-sans'>
@@ -324,12 +329,25 @@ const handleFollowToggle = async (creatorId: string) => {
                   </div>
 
                   {/* BOTTOM INFO */}
-                  <div className='flex justify-between items-center'>
-                    <span className='text-xs font-medium'>
-                      @{img.id.slice(0, 8)}
+                  {/* BOTTOM INFO */}
+                  <div className='flex justify-between items-center mt-auto w-full'>
+                    <span
+                      onClick={() => {
+                        setSelectedCreatorId(img.userId);
+                        fetchCreatorProfile(img.userId);
+                      }}
+                      className='text-xs font-medium text-white/90 hover:underline cursor-pointer truncate max-w-[100px]'
+                    >
+                      @{img.userId ? img.userId.slice(0, 8) : "creator"}
                     </span>
 
-                    <button className='text-[10px] bg-white text-black px-3 py-1 rounded-full font-bold'>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFollowToggle(img.userId);
+                      }}
+                      className='text-[10px] bg-white text-black px-3 py-1 rounded-full font-bold hover:bg-zinc-200 transition-all'
+                    >
                       Follow
                     </button>
                   </div>
@@ -341,56 +359,83 @@ const handleFollowToggle = async (creatorId: string) => {
       </main>
 
       {/* MODAL */}
+      {/* MODAL */}
       {isUploadOpen && (
         <div className='fixed inset-0 bg-black/90 flex justify-center items-center z-50'>
-          <div className='bg-zinc-900 p-8 rounded-3xl w-full max-w-lg'>
-            <h2 className='text-2xl mb-6 font-bold'>Create Pin</h2>
+          ...
+        </div>
+      )}
 
-            {/* Upload Box */}
-            <label className='flex items-center justify-center w-full h-52 border-2 border-dashed border-zinc-600 rounded-2xl cursor-pointer hover:border-red-500 transition overflow-hidden mb-5'>
-              {file ? (
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt='Preview'
-                  className='w-full h-full object-cover'
-                />
-              ) : (
-                <div className='text-center'>
-                  <p className='text-zinc-300 text-lg font-semibold'>
-                    Click to Upload Image
-                  </p>
-
-                  <p className='text-zinc-500 text-sm mt-2'>PNG, JPG, JPEG</p>
-                </div>
-              )}
-
-              <input
-                type='file'
-                accept='image/*'
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className='hidden'
-              />
-            </label>
-
-            {/* Category */}
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className='w-full mb-4 p-3 bg-zinc-800 rounded-xl'
-            >
-              <option>Abstract</option>
-              <option>Nature</option>
-              <option>Tech</option>
-              <option>Portrait</option>
-            </select>
-
-            {/* Upload Button */}
+      {/* CREATOR PROFILE FLOATING MODAL OVERLAY */}
+      {selectedCreatorId && creatorProfile && (
+        <div className='fixed inset-0 bg-black/95 overflow-y-auto z-50 p-6 flex flex-col items-center'>
+          <div className='w-full max-w-5xl flex justify-start mb-8'>
             <button
-              onClick={handleUpload}
-              className='bg-red-600 hover:bg-red-700 w-full py-3 rounded-xl font-bold'
+              onClick={() => {
+                setSelectedCreatorId(null);
+                setCreatorProfile(null);
+                fetchImages();
+              }}
+              className='bg-zinc-800 text-white font-bold px-6 py-2 rounded-full hover:bg-zinc-700 transition'
             >
-              {status || "Upload"}
+              ← Back to Explore
             </button>
+          </div>
+
+          <div className='flex flex-col items-center mb-12 border-b border-zinc-800 pb-8 w-full max-w-xl'>
+            <div className='w-24 h-24 rounded-full bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center text-3xl font-extrabold mb-4 uppercase'>
+              {selectedCreatorId.slice(5, 7)}
+            </div>
+
+            <h2 className='text-2xl font-bold mb-2'>
+              @{selectedCreatorId.slice(0, 12)}...
+            </h2>
+
+            <div className='flex gap-6 text-sm text-zinc-400 mb-5 font-semibold'>
+              <span>{creatorProfile.followers} Followers</span>
+              <span>•</span>
+              <span>{creatorProfile.following} Following</span>
+            </div>
+
+            {userId !== selectedCreatorId && (
+              <button
+                onClick={() => handleFollowToggle(selectedCreatorId)}
+                className={`px-8 py-3 rounded-full font-bold text-sm transition-all shadow-md ${
+                  isFollowingCreator
+                    ? "bg-zinc-700 text-white"
+                    : "bg-red-600 text-white hover:bg-red-700"
+                }`}
+              >
+                {isFollowingCreator ? "Following" : "Follow"}
+              </button>
+            )}
+          </div>
+
+          <div className='w-full max-w-6xl'>
+            <h3 className='text-xl font-bold mb-6 text-zinc-300'>
+              Created Pins
+            </h3>
+
+            {creatorProfile.images.length === 0 ? (
+              <p className='text-zinc-500 text-center py-12'>
+                This creator hasn't published any pins yet.
+              </p>
+            ) : (
+              <div className='columns-2 md:columns-3 lg:columns-5 gap-4 space-y-4'>
+                {creatorProfile.images.map((item) => (
+                  <div
+                    key={item.id}
+                    className='break-inside-avoid relative rounded-2xl overflow-hidden shadow-lg'
+                  >
+                    <img
+                      src={item.url}
+                      className='w-full h-auto object-cover rounded-2xl'
+                      alt='Creator post'
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
