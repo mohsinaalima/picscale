@@ -30,6 +30,11 @@ export default function Home() {
   const [status, setStatus] = useState("");
   const [images, setImages] = useState<ImageType[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
+  // Creator Profile View Management
+  const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
+  const [creatorProfile, setCreatorProfile] = useState<{ images: ImageType[]; followers: number; following: number } | null>(null);
+  const [isFollowingCreator, setIsFollowingCreator] = useState(false);
+  
 
   const BASE_URL = "http://localhost:5000";
 
@@ -174,6 +179,58 @@ export default function Home() {
       console.error("Error saving image:", err);
     }
   };
+
+  // ===============================
+// Fetch Creator Profile Analytics
+// ===============================
+const fetchCreatorProfile = async (creatorId: string) => {
+  try {
+    const profileRes = await fetch(`${BASE_URL}/profile/${creatorId}`);
+    const profileData = await profileRes.json();
+    setCreatorProfile(profileData);
+
+    if (userId) {
+      const checkRes = await fetch(
+        `${BASE_URL}/follow/check?followerId=${userId}&followingId=${creatorId}`
+      );
+      const checkData = await checkRes.json();
+      setIsFollowingCreator(checkData.isFollowing);
+    }
+  } catch (err) {
+    console.error("Failed to load creator profile data:", err);
+  }
+};
+
+// ===============================
+// Trigger Follow / Unfollow Toggle
+// ===============================
+const handleFollowToggle = async (creatorId: string) => {
+  if (!userId) return alert("Please sign in to follow creators!");
+  if (userId === creatorId)
+    return alert("You cannot follow yourself!");
+
+  try {
+    const res = await fetch(`${BASE_URL}/follow`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        followerId: userId,
+        followingId: creatorId,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      alert(data.message);
+
+      fetchCreatorProfile(creatorId);
+    }
+  } catch (err) {
+    console.error("Follow operational exception caught:", err);
+  }
+};
 
   return (
     <div className='min-h-screen bg-black text-white font-sans'>
