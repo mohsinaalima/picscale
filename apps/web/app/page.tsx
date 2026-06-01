@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import {
   SignedIn,
   SignedOut,
@@ -30,7 +29,10 @@ export default function Home() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [status, setStatus] = useState("");
   const [images, setImages] = useState<ImageType[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "saved" | "following">(
+    "all",
+  );
+
   // Creator Profile View Management
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(
     null,
@@ -44,22 +46,24 @@ export default function Home() {
 
   const BASE_URL = "http://localhost:5000";
 
-  // Clerk
+  // Clerk Authentication
   const { userId } = useAuth();
   const { user } = useUser();
 
   // ===============================
-  // Fetch Images
+  // Fetch Images Logic
   // ===============================
   const fetchImages = async () => {
     try {
-      const endpoint =
-        activeTab === "saved" && userId
-          ? `${BASE_URL}/users/${userId}/saved`
-          : `${BASE_URL}/images`;
+      let endpoint = `${BASE_URL}/images`;
+
+      if (activeTab === "saved" && userId) {
+        endpoint = `${BASE_URL}/users/${userId}/saved`;
+      } else if (activeTab === "following" && userId) {
+        endpoint = `${BASE_URL}/images?filter=following&userId=${userId}`;
+      }
 
       const res = await fetch(endpoint);
-
       const data = await res.json();
 
       if (Array.isArray(data)) {
@@ -74,28 +78,23 @@ export default function Home() {
     }
   };
 
+  // Run image fetch every time the tab or login status changes
+  useEffect(() => {
+    fetchImages();
+  }, [activeTab, userId]);
+
   // ===============================
-  // Upload Image
+  // Upload Image Handler
   // ===============================
   const handleUpload = async () => {
-    if (!file) {
-      return alert("Please choose a file first!");
-    }
-
-    if (!userId) {
-      return alert("Please login first!");
-    }
+    if (!file) return alert("Please choose a file first!");
+    if (!userId) return alert("Please login first!");
 
     setStatus("Uploading...");
-
     const formData = new FormData();
-
     formData.append("image", file);
     formData.append("category", category);
-
-    // Send Clerk User Data
     formData.append("userId", userId);
-
     formData.append("userEmail", user?.primaryEmailAddress?.emailAddress || "");
 
     try {
@@ -105,15 +104,11 @@ export default function Home() {
       });
 
       const data = await res.json();
-
       console.log("UPLOAD RESPONSE:", data);
 
-      if (!res.ok) {
-        throw new Error(data.error || "Upload failed");
-      }
+      if (!res.ok) throw new Error(data.error || "Upload failed");
 
       setStatus("Success!");
-
       await fetchImages();
 
       setTimeout(() => {
@@ -128,28 +123,20 @@ export default function Home() {
   };
 
   // ===============================
-  // Like Image
+  // Like Image Interaction
   // ===============================
   const handleLike = async (imgId: string) => {
     if (!userId) return alert("Login to like!");
 
     try {
-      const res = await fetch("http://localhost:5000/like", {
+      const res = await fetch(`${BASE_URL}/like`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          imageId: imgId,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, imageId: imgId }),
       });
 
       const data = await res.json();
-
       console.log(data.message);
-
-      // Refresh feed
       fetchImages();
     } catch (err) {
       console.error("Like failed:", err);
@@ -157,29 +144,22 @@ export default function Home() {
   };
 
   // ===============================
-  // Save Image
+  // Save/Unsave Toggle Logic
   // ===============================
   const handleSave = async (imgId: string) => {
-    if (!userId) {
-      alert("Please sign in to save pins!");
-      return;
-    }
+    if (!userId) return alert("Please sign in to save pins!");
 
     try {
-      const res = await fetch("http://localhost:5000/save", {
+      const res = await fetch(`${BASE_URL}/images/${imgId}/save`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId,
-          imageId: imgId,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, imageId: imgId }),
       });
 
       if (res.ok) {
         const data = await res.json();
         alert(data.message);
+        if (activeTab === "saved") fetchImages(); // Quick UI clean refresh
       }
     } catch (err) {
       console.error("Error saving image:", err);
@@ -217,19 +197,13 @@ export default function Home() {
     try {
       const res = await fetch(`${BASE_URL}/follow`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          followerId: userId,
-          followingId: creatorId,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followerId: userId, followingId: creatorId }),
       });
 
       if (res.ok) {
         const data = await res.json();
         alert(data.message);
-
         fetchCreatorProfile(creatorId);
       }
     } catch (err) {
@@ -246,18 +220,17 @@ export default function Home() {
         <div className='flex gap-6 items-center'>
           <SignedOut>
             <div className='bg-zinc-800 hover:bg-zinc-700 px-6 py-2 rounded-full font-bold cursor-pointer'>
-              <SignInButton mode='modal' />
+              <SignInButton mode='modal' fallbackRedirectUrl='/' />
             </div>
           </SignedOut>
 
           <SignedIn>
             <button
               onClick={() => setIsUploadOpen(true)}
-              className='bg-red-600 hover:bg-red-700 px-6 py-2 rounded-full font-bold'
+              className='bg-red-600 hover:bg-red-700 px-6 py-2 rounded-full font-bold transition'
             >
               Create
             </button>
-
             <UserButton />
           </SignedIn>
         </div>
@@ -277,6 +250,17 @@ export default function Home() {
         </button>
 
         <button
+          onClick={() => setActiveTab("following")}
+          className={`px-4 py-2 rounded-full transition-all ${
+            activeTab === "following"
+              ? "bg-white text-black"
+              : "text-zinc-400 hover:text-white"
+          }`}
+        >
+          Following Feed
+        </button>
+
+        <button
           onClick={() => setActiveTab("saved")}
           className={`px-4 py-2 rounded-full transition-all ${
             activeTab === "saved"
@@ -291,45 +275,45 @@ export default function Home() {
       {/* GALLERY */}
       <main className='max-w-7xl mx-auto p-6'>
         {images.length === 0 ? (
-          <div className='flex justify-center h-64 text-zinc-500 items-center'>
-            No pins yet.
+          <div className='flex justify-center h-64 text-zinc-500 items-center animate-pulse'>
+            No pins found in this tab.
           </div>
         ) : (
           <div className='columns-2 md:columns-3 lg:columns-5 gap-4 space-y-4'>
             {images.map((img) => (
-              <div key={img.id} className='break-inside-avoid group relative'>
+              <div
+                key={img.id}
+                className='break-inside-avoid group relative transition duration-300'
+              >
                 <img
                   src={img.url}
-                  className='rounded-2xl w-full'
-                  alt={img.category}
+                  className='rounded-2xl w-full object-cover'
+                  alt={img.category || "Post image"}
                 />
 
-                {/* OVERLAY */}
-                <div className='absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all p-4 flex flex-col justify-between rounded-2xl'>
-                  {/* TOP BUTTONS */}
+                {/* INTERACTIVE HOVER OVERLAY */}
+                <div className='absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-200 p-4 flex flex-col justify-between rounded-2xl'>
+                  {/* TOP ACTIONS */}
                   <div className='flex justify-end gap-2'>
-                    {/* LIKE BUTTON */}
                     <button
                       onClick={() => handleLike(img.id)}
-                      className='bg-zinc-100/20 backdrop-blur-md p-2 rounded-full hover:bg-white/40'
+                      className='bg-zinc-100/20 backdrop-blur-md p-2 rounded-full hover:bg-white/40 text-lg transition'
                     >
                       ❤️
                     </button>
 
-                    {/* SAVE BUTTON */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleSave(img.id);
                       }}
-                      className='bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold text-sm transition-all shadow-md'
+                      className='bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-bold text-sm transition shadow-md'
                     >
                       Save
                     </button>
                   </div>
 
-                  {/* BOTTOM INFO */}
-                  {/* BOTTOM INFO */}
+                  {/* BOTTOM ACTIONS */}
                   <div className='flex justify-between items-center mt-auto w-full'>
                     <span
                       onClick={() => {
@@ -346,7 +330,7 @@ export default function Home() {
                         e.stopPropagation();
                         handleFollowToggle(img.userId);
                       }}
-                      className='text-[10px] bg-white text-black px-3 py-1 rounded-full font-bold hover:bg-zinc-200 transition-all'
+                      className='text-[10px] bg-white text-black px-3 py-1 rounded-full font-bold hover:bg-zinc-200 transition'
                     >
                       Follow
                     </button>
@@ -358,11 +342,63 @@ export default function Home() {
         )}
       </main>
 
-      {/* MODAL */}
-      {/* MODAL */}
+      {/* UPLOAD PIN MODAL */}
       {isUploadOpen && (
-        <div className='fixed inset-0 bg-black/90 flex justify-center items-center z-50'>
-          ...
+        <div className='fixed inset-0 bg-black/90 flex justify-center items-center z-50 p-4 backdrop-blur-sm'>
+          <div className='bg-zinc-900 p-8 rounded-3xl w-full max-w-lg relative border border-zinc-800 shadow-2xl'>
+            <button
+              onClick={() => setIsUploadOpen(false)}
+              className='absolute top-4 right-4 text-zinc-400 hover:text-white font-bold text-lg p-2 transition'
+            >
+              ✕
+            </button>
+            <h2 className='text-2xl mb-6 font-bold text-white'>Create Pin</h2>
+
+            {/* File Drop Box */}
+            <label className='flex items-center justify-center w-full h-52 border-2 border-dashed border-zinc-700 rounded-2xl cursor-pointer hover:border-red-500 transition overflow-hidden mb-5 bg-black/30'>
+              {file ? (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt='Preview'
+                  className='w-full h-full object-cover'
+                />
+              ) : (
+                <div className='text-center p-4'>
+                  <p className='text-zinc-300 text-lg font-semibold'>
+                    Click to Upload Image
+                  </p>
+                  <p className='text-zinc-500 text-sm mt-2'>
+                    Supports PNG, JPG, JPEG
+                  </p>
+                </div>
+              )}
+              <input
+                type='file'
+                accept='image/*'
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className='hidden'
+              />
+            </label>
+
+            {/* Category selection drop */}
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className='w-full mb-6 p-3 bg-zinc-800 rounded-xl text-white outline-none border border-zinc-700 focus:border-red-500 transition'
+            >
+              <option>Abstract</option>
+              <option>Nature</option>
+              <option>Tech</option>
+              <option>Portrait</option>
+            </select>
+
+            <button
+              onClick={handleUpload}
+              className='bg-red-600 hover:bg-red-700 w-full py-3 rounded-xl font-bold text-white shadow-lg transition duration-200'
+            >
+              {status || "Upload"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -383,11 +419,11 @@ export default function Home() {
           </div>
 
           <div className='flex flex-col items-center mb-12 border-b border-zinc-800 pb-8 w-full max-w-xl'>
-            <div className='w-24 h-24 rounded-full bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center text-3xl font-extrabold mb-4 uppercase'>
+            <div className='w-24 h-24 rounded-full bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center text-3xl font-extrabold mb-4 uppercase text-white shadow-md'>
               {selectedCreatorId.slice(5, 7)}
             </div>
 
-            <h2 className='text-2xl font-bold mb-2'>
+            <h2 className='text-2xl font-bold mb-2 text-white'>
               @{selectedCreatorId.slice(0, 12)}...
             </h2>
 
