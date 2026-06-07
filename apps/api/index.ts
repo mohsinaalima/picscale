@@ -1,78 +1,78 @@
 import express from "express";
-import multer from "multer";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
-import "dotenv/config";
 
 const prisma = new PrismaClient();
 const app = express();
 
-// Cloudinary config
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// Middleware
+app.use(cors());
+app.use(express.json());
 
 // Debug env check
 console.log("ENV CHECK:", {
   key: process.env.CLOUDINARY_API_KEY ? "OK" : "MISSING",
 });
 
-// Storage
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async () => ({
-    folder: "user_uploads",
-  }),
+// ==========================================
+// INLINE CLOUDINARY & MULTER CONFIGURATION
+// ==========================================
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const upload = multer({ storage });
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    return {
+      folder: "picscale_user_uploads", // Cloudinary par folder ka naam
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 1000, crop: "limit" }], // Image optimization
+    };
+  },
+});
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // Max file size: 5MB
+});
 
 // ===============================
 // Upload Route
 // ===============================
 app.post("/upload", upload.single("image"), async (req, res) => {
-  console.log("📦 FILE DATA:", req.file);
-
-  const { category, userId } = req.body;
-
-  if (!req.file) {
-    console.log("No file received");
-
-    return res.status(400).json({
-      error: "No file uploaded",
-    });
-  }
-
   try {
-    const imageUrl = req.file.path;
+    const { category, userId } = req.body;
 
-    console.log("Cloudinary URL:", imageUrl);
+    if (!req.file) {
+      return res.status(400).json({
+        error: "No image file uploaded or invalid format",
+      });
+    }
+
+    const imageUrl = (req.file as any).path;
 
     const newImage = await prisma.image.create({
       data: {
-        url: (req.file as any).path,
+        url: imageUrl,
         category: category || "Abstract",
         status: "COMPLETED",
         userId,
       },
     });
 
-    console.log("DB SAVED:", newImage);
-
-    res.status(201).json(newImage);
-  } catch (error: any) {
-    console.error("ERROR:", error);
-
-    res.status(500).json({
-      error: "Internal Server Error",
+    console.log("🔥 Cloudinary Asset Created & Neon DB Synced:", newImage.id);
+    return res.status(201).json(newImage);
+  } catch (error) {
+    console.error("Cloud Upload Core Engine Failure:", error);
+    return res.status(500).json({
+      error: "Internal Server Error during asset syncing",
     });
   }
 });
@@ -92,18 +92,17 @@ app.delete("/images/:id", async (req, res) => {
       return res.status(404).send("Not found");
     }
 
-    // Delete from Cloudinary
     const publicId = image.url.split("/").pop()?.split(".")[0];
 
-    await cloudinary.uploader.destroy(`picscale_uploads/${publicId}`);
+    await cloudinary.uploader.destroy(`picscale_user_uploads/${publicId}`);
 
-    // Delete from DB
     await prisma.image.delete({
       where: { id },
     });
 
     res.send("Deleted successfully");
   } catch (err) {
+    console.error(err);
     res.status(500).send("Delete failed");
   }
 });
@@ -283,7 +282,6 @@ app.get("/users/:userId/saved", async (req, res) => {
     res.json(savedImages);
   } catch (error) {
     console.error(error);
-
     res.status(500).json({
       error: "Failed to fetch saved images",
     });
@@ -344,6 +342,27 @@ app.post("/follow", async (req, res) => {
 });
 
 // ===============================
+// CHECK IF FOLLOWING (ADDED NEW)
+// ===============================
+app.get("/follow/check", async (req, res) => {
+  const { followerId, followingId } = req.query;
+
+  try {
+    const follow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: String(followerId),
+          followingId: String(followingId),
+        },
+      },
+    });
+    res.json({ isFollowing: !!follow });
+  } catch (error) {
+    res.status(500).json({ isFollowing: false });
+  }
+});
+
+// ===============================
 // GET PROFILE ROUTE
 // ===============================
 app.get("/profile/:id", async (req, res) => {
@@ -370,14 +389,13 @@ app.get("/profile/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Profile fetch error:", error);
-
     res.status(500).json({
       error: "Failed to fetch profile details",
     });
   }
 });
-// Start Server
 
+// Start Server
 app.listen(5000, () => {
   console.log("🚀 API running on http://localhost:5000");
 });
