@@ -107,14 +107,23 @@ app.delete("/images/:id", async (req, res) => {
   }
 });
 
+
 // ===============================
-// Fetch Images
+// Fetch Images (With Search Support)
 // ===============================
 app.get("/images", async (req, res) => {
-  const { userId, filter } = req.query;
+  const { userId, filter, search } = req.query; 
 
   try {
     let whereClause: any = { status: "COMPLETED" };
+
+    // Search filter logic
+    if (search) {
+      whereClause.category = {
+        contains: String(search), // Keyword match karega (e.g., "nat" matches "Nature")
+        mode: 'insensitive'        // Capital/Small letter ka farq mita dega (Case-insensitive)
+      };
+    }
 
     if (filter === "saved" && userId) {
       const savedRecords = await prisma.save.findMany({
@@ -132,16 +141,14 @@ app.get("/images", async (req, res) => {
       whereClause.userId = { in: followingIds };
     }
 
-    // Fetch images with their likes relation included
     const images = await prisma.image.findMany({
       where: whereClause,
       include: {
-        likes: true, // Yeh har image ke saare likes lekar aayega
+        likes: true,
       },
       orderBy: { createdAt: "desc" },
     });
 
-    // Format data taaki frontend ko count aur liked status asaani se mil jaye
     const formattedImages = images.map((img) => {
       return {
         id: img.id,
@@ -149,10 +156,10 @@ app.get("/images", async (req, res) => {
         category: img.category,
         userId: img.userId,
         createdAt: img.createdAt,
-        likeCount: img.likes.length, // Total likes ka count
+        likeCount: img.likes.length,
         isLikedByMe: userId
           ? img.likes.some((like) => like.userId === userId)
-          : false, // Kya maine like kiya hai?
+          : false,
       };
     });
 

@@ -18,8 +18,8 @@ type ImageType = {
   url: string;
   category?: string;
   userId: string;
-  likeCount: number;     
-  isLikedByMe: boolean;  
+  likeCount: number;
+  isLikedByMe: boolean;
 };
 
 // ===============================
@@ -27,6 +27,7 @@ type ImageType = {
 // ===============================
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState("Abstract");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [status, setStatus] = useState("");
@@ -57,12 +58,17 @@ export default function Home() {
   // ===============================
   const fetchImages = async () => {
     try {
-      let endpoint = `${BASE_URL}/images`;
+      let endpoint = `${BASE_URL}/images?`;
+
+      // Append Search Param if present
+      if (searchQuery) {
+        endpoint += `search=${searchQuery}&`;
+      }
 
       if (activeTab === "saved" && userId) {
-        endpoint = `${BASE_URL}/users/${userId}/saved`;
+        endpoint += `filter=saved&userId=${userId}`;
       } else if (activeTab === "following" && userId) {
-        endpoint = `${BASE_URL}/images?filter=following&userId=${userId}`;
+        endpoint += `filter=following&userId=${userId}`;
       }
 
       const res = await fetch(endpoint);
@@ -80,10 +86,10 @@ export default function Home() {
     }
   };
 
-  // Run image fetch every time the tab or login status changes
+  // Re-fetch images every time tab, login, or searchQuery updates!
   useEffect(() => {
     fetchImages();
-  }, [activeTab, userId]);
+  }, [activeTab, userId, searchQuery]);
 
   // ===============================
   // Upload Image Handler
@@ -216,8 +222,38 @@ export default function Home() {
   return (
     <div className='min-h-screen bg-black text-white font-sans'>
       {/* NAVBAR */}
-      <nav className='flex justify-between items-center p-6 sticky top-0 bg-black/80 backdrop-blur-md z-40 border-b border-zinc-800'>
-        <h1 className='text-3xl font-bold text-red-600'>PicScale</h1>
+      <nav className='flex justify-between items-center p-6 sticky top-0 bg-black/80 backdrop-blur-md z-40 border-b border-zinc-800 gap-4'>
+        <h1
+          className='text-3xl font-bold text-red-600 cursor-pointer'
+          onClick={() => {
+            setSearchQuery("");
+            setActiveTab("all");
+          }}
+        >
+          PicScale
+        </h1>
+
+        {/* SEARCH BAR */}
+        <div className='flex-1 max-w-2xl mx-4 relative hidden sm:block'>
+          <span className='absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold'>
+            
+          </span>
+          <input
+            type='text'
+            placeholder='Search categories (e.g. Nature, Tech, Abstract)...'
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className='w-full bg-zinc-800 text-white pl-12 pr-4 py-2.5 rounded-full outline-none focus:bg-zinc-700 border border-transparent focus:border-zinc-600 text-sm transition-all'
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className='absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white text-xs font-bold'
+            >
+              Clear
+            </button>
+          )}
+        </div>
 
         <div className='flex gap-6 items-center'>
           <SignedOut>
@@ -296,13 +332,22 @@ export default function Home() {
                 {/* INTERACTIVE HOVER OVERLAY */}
                 <div className='absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-200 p-4 flex flex-col justify-between rounded-2xl'>
                   {/* TOP ACTIONS */}
-                  <div className='flex justify-end gap-2'>
-                    <button
-                      onClick={() => handleLike(img.id)}
-                      className='bg-zinc-100/20 backdrop-blur-md p-2 rounded-full hover:bg-white/40 text-lg transition'
-                    >
-                      ❤️
-                    </button>
+                  <div className='flex justify-end gap-2 items-start'>
+                    <div className='flex flex-col items-center gap-1'>
+                      <button
+                        onClick={() => handleLike(img.id)}
+                        className={`backdrop-blur-md p-2 rounded-full transition text-lg ${
+                          img.isLikedByMe
+                            ? "bg-red-600/80 text-white scale-110 hover:bg-red-600"
+                            : "bg-zinc-100/20 text-white hover:bg-white/40"
+                        }`}
+                      >
+                        ❤️
+                      </button>
+                      <span className='text-[11px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full drop-shadow-md'>
+                        {img.likeCount} {img.likeCount === 1 ? "like" : "likes"}
+                      </span>
+                    </div>
 
                     <button
                       onClick={(e) => {
