@@ -21,7 +21,6 @@ console.log("ENV CHECK:", {
   key: process.env.CLOUDINARY_API_KEY ? "OK" : "MISSING",
 });
 
-
 // Storage
 const storage = new CloudinaryStorage({
   cloudinary,
@@ -113,19 +112,55 @@ app.delete("/images/:id", async (req, res) => {
 // Fetch Images
 // ===============================
 app.get("/images", async (req, res) => {
+  const { userId, filter } = req.query;
+
   try {
+    let whereClause: any = { status: "COMPLETED" };
+
+    if (filter === "saved" && userId) {
+      const savedRecords = await prisma.save.findMany({
+        where: { userId: String(userId) },
+        select: { imageId: true },
+      });
+      const savedIds = savedRecords.map((r) => r.imageId);
+      whereClause.id = { in: savedIds };
+    } else if (filter === "following" && userId) {
+      const following = await prisma.follow.findMany({
+        where: { followerId: String(userId) },
+        select: { followingId: true },
+      });
+      const followingIds = following.map((f) => f.followingId);
+      whereClause.userId = { in: followingIds };
+    }
+
+    // Fetch images with their likes relation included
     const images = await prisma.image.findMany({
-      where: { status: "COMPLETED" },
+      where: whereClause,
+      include: {
+        likes: true, // Yeh har image ke saare likes lekar aayega
+      },
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(images);
-  } catch (error) {
-    console.error("Fetch Error:", error);
-
-    res.status(500).json({
-      error: "Failed to fetch images",
+    // Format data taaki frontend ko count aur liked status asaani se mil jaye
+    const formattedImages = images.map((img) => {
+      return {
+        id: img.id,
+        url: img.url,
+        category: img.category,
+        userId: img.userId,
+        createdAt: img.createdAt,
+        likeCount: img.likes.length, // Total likes ka count
+        isLikedByMe: userId
+          ? img.likes.some((like) => like.userId === userId)
+          : false, // Kya maine like kiya hai?
+      };
     });
+
+    res.json(formattedImages);
+  } catch (error) {
+    console.error("Fetch images error:", error);
+    res.status(500).json({ error: "Failed to fetch images" });
   }
 });
 
@@ -243,9 +278,7 @@ app.get("/users/:userId/saved", async (req, res) => {
       },
     });
 
-    const savedImages = savedRecords.map(
-      (record) => record.image
-    );
+    const savedImages = savedRecords.map((record) => record.image);
 
     res.json(savedImages);
   } catch (error) {

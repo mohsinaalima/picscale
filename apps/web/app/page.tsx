@@ -18,6 +18,8 @@ type ImageType = {
   url: string;
   category?: string;
   userId: string;
+  likeCount: number;     
+  isLikedByMe: boolean;  
 };
 
 // ===============================
