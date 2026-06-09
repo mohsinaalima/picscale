@@ -51,3 +51,22 @@ model Follow {
 
   @@unique([followerId, followingId])
 }
+
+model Chat {
+  id         String    @id @default(uuid())
+  userOneId  String    // Chat shuru karne wala (Clerk User ID)
+  userTwoId  String    // Receive karne wala (Clerk User ID)
+  createdAt  DateTime  @default(now())
+  messages   Message[]
+
+  @@unique([userOneId, userTwoId]) // Taaki do creators ke beech double rooms na banein
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  chatId     String
+  chat       Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId   String   // Jisne text bheja uski Clerk ID
+  text       String
+  createdAt  DateTime @default(now())
+}

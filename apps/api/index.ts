@@ -107,12 +107,11 @@ app.delete("/images/:id", async (req, res) => {
   }
 });
 
-
 // ===============================
 // Fetch Images (With Search Support)
 // ===============================
 app.get("/images", async (req, res) => {
-  const { userId, filter, search } = req.query; 
+  const { userId, filter, search } = req.query;
 
   try {
     let whereClause: any = { status: "COMPLETED" };
@@ -121,7 +120,7 @@ app.get("/images", async (req, res) => {
     if (search) {
       whereClause.category = {
         contains: String(search), // Keyword match karega (e.g., "nat" matches "Nature")
-        mode: 'insensitive'        // Capital/Small letter ka farq mita dega (Case-insensitive)
+        mode: "insensitive", // Capital/Small letter ka farq mita dega (Case-insensitive)
       };
     }
 
@@ -399,6 +398,103 @@ app.get("/profile/:id", async (req, res) => {
     res.status(500).json({
       error: "Failed to fetch profile details",
     });
+  }
+});
+
+// ==========================================
+// 💬 CHAT ENGINE ENDPOINTS
+// ==========================================
+
+// 1. Create or Fetch Existing Chat Room
+app.post("/chats", async (req, res) => {
+  const { senderId, receiverId } = req.body;
+
+  if (!senderId || !receiverId) {
+    return res.status(400).json({ error: "Missing sender or receiver IDs" });
+  }
+
+  // Ensure userOneId is always alphabetically smaller than userTwoId to maintain uniqueness
+  const userOneId = senderId < receiverId ? senderId : receiverId;
+  const userTwoId = senderId < receiverId ? receiverId : senderId;
+
+  try {
+    const chat = await prisma.chat.upsert({
+      where: {
+        userOneId_userTwoId: { userOneId, userTwoId },
+      },
+      update: {},
+      create: { userOneId, userTwoId },
+    });
+
+    res.json(chat);
+  } catch (error) {
+    console.error("Failed to create/fetch chat room:", error);
+    res.status(500).json({ error: "Chat initialization failed" });
+  }
+});
+
+// 2. Send Message inside a Room
+app.post("/messages", async (req, res) => {
+  const { chatId, senderId, text } = req.body;
+
+  if (!chatId || !senderId || !text) {
+    return res
+      .status(400)
+      .json({ error: "Missing required message parameters" });
+  }
+
+  try {
+    const message = await prisma.message.create({
+      data: {
+        chatId,
+        senderId,
+        text,
+      },
+    });
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Message send failure:", error);
+    res.status(500).json({ error: "Could not deliver message" });
+  }
+});
+
+// 3. Fetch all messages for a specific Chat Room
+app.get("/chats/:chatId/messages", async (req, res) => {
+  const { chatId } = req.params;
+
+  try {
+    const messages = await prisma.message.findMany({
+      where: { chatId },
+      orderBy: { createdAt: "asc" }, // Oldest first, newest bottom
+    });
+    res.json(messages);
+  } catch (error) {
+    console.error("Fetch messages failure:", error);
+    res.status(500).json({ error: "Failed to retrieve conversation history" });
+  }
+});
+
+// 4. Fetch User's Active Inbox (All active chat rooms)
+app.get("/users/:userId/chats", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const activeChats = await prisma.chat.findMany({
+      where: {
+        OR: [{ userOneId: userId }, { userTwoId: userId }],
+      },
+      include: {
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1, // Preview for the latest message text
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(activeChats);
+  } catch (error) {
+    console.error("Inbox query failure:", error);
+    res.status(500).json({ error: "Could not load user conversations" });
   }
 });
 
