@@ -7,7 +7,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
-    // THE KEY FIX: Disable the strict "verbatim" check
+    
     "verbatimModuleSyntax": false,
     "types": ["node"],
     "outDir": "./dist",
