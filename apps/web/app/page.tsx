@@ -69,7 +69,7 @@ export default function Home() {
   const [newMessageText, setNewMessageText] = useState("");
   const [userChats, setUserChats] = useState<ChatType[]>([]);
 
-  const BASE_URL = "http://localhost:5000";
+  const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
   // Clerk Authentication
   const { userId } = useAuth();
