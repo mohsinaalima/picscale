@@ -1,3 +1,4 @@
+import express from "express";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import path from "path";
@@ -54,3 +55,7 @@ console.log("🤖 PicScale Worker is alive and watching for images...");
 
 // Poll every 5 seconds
 setInterval(processImages, 5000);
+const app = express();
+const PORT = process.env.PORT || 10000;
+app.get("/", (req, res) => res.send("Worker is healthy!"));
+app.listen(PORT, () => console.log(`🎯 Dummy port listening on ${PORT}`));
