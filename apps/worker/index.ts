@@ -57,5 +57,9 @@ console.log("🤖 PicScale Worker is alive and watching for images...");
 setInterval(processImages, 5000);
 const app = express();
 const PORT = process.env.PORT || 10000;
-app.get("/", (req, res) => res.send("Worker is healthy!"));
+
+app.get("/", (req: any, res: any) => {
+  res.send("Worker is healthy!");
+});
+
 app.listen(PORT, () => console.log(`🎯 Dummy port listening on ${PORT}`));
